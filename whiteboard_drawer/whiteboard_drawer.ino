@@ -1,11 +1,8 @@
-
 // Lets draw saucy ponys !!!1elf!!
-
 
 #include <StepControl.h>
 #include <SoftwareSerial.h>   // We need this even if we're not using a SoftwareSerial object
-
-// Due to the way the Arduino IDE compiles
+#include <Servo.h>
 
 #define HWSERIAL Serial1
 
@@ -19,7 +16,10 @@
 #define LENGTH_PER_REVOLUTION  (DIAMETER * PI) //mm
 #define LPS (LENGTH_PER_REVOLUTION / STEP_PER_REVOLUTION)
 
+#define SERVOUP 40
 #define SERIALBUFFERLEN 40 //bufferlength of serial parser
+
+Servo myservo;
 
 struct Position_in_M1_Struct {
   float x;
@@ -38,6 +38,9 @@ float zPos; //z pos
 char *pos2; //pointer 1
 char *pos1; //pos pointer 2
 
+int servodown = 50; //servoposition value
+int linecount;      //internal linecounter
+
 char Message[SERIALBUFFERLEN]; // incoming String
 
 float feedRate = 250;
@@ -54,6 +57,7 @@ char serialData[8];
 
 void setup()
 {
+  myservo.attach(3);
 
   Serial.begin(115200);
   HWSERIAL.begin(115200);
@@ -67,21 +71,9 @@ void setup()
   .setMaxSpeed(feedRate)       // steps/s
   .setAcceleration(100000000); // steps/s^2
 
-  delay(5000);
-
-  /*pos_in_M1.x = 200;
-    pos_in_M1.y = 0;
-    Serial.printf("Original: x: %f y: %f \n", pos_in_M1.x, pos_in_M1.y);
-
-    pos_in_M1 = to_M1(to_M2(pos_in_M1));
-    Serial.printf("Back in M1 x: %f y: %f \n", pos_in_M1.x, pos_in_M1.y);
-
-
-    pos_in_M1.x = (LENGTH_C / 2.0) - 300;
-    pos_in_M1.y = 0;
-    line(pos_in_M1);
-  */
-
+  pos_in_M1.x = (LENGTH_C / 2.0) - 300;
+  pos_in_M1.y = 0;
+  line(pos_in_M1);
 }
 
 void loop()
@@ -97,20 +89,43 @@ void loop()
       }
     }
 
-    if (!strncmp(Message, "G1 ", 3) || !strncmp(Message, "G0 ", 3)) { //parsing part, it works...
+    if (!strncmp(Message, "G01 ", 3) || !strncmp(Message, "G00 ", 3)) { //parsing part, it works...
       for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
         if (Message[j] == 'X') {  //check for an X
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++;  //increment until next whitespace
-          xPos = strtof(Message + j, &pos1);  //get float value
+          pos_in_M1.x = strtof(Message + j, &pos1);  //get float value
         } else if (Message[j] == 'Y') { //check for an Y
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
-          yPos = strtof(Message + j, &pos1); //get float value
-        } else if (Message[j] == 'Z') { //check for an Z
+          pos_in_M1.y = strtof(Message + j, &pos1); //get float value
+        } else if (Message[j] == 'Z') { //check for an Y
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++; //increment until next whitespace
+          servodown = (int)strtof(Message + j, &pos1); //get float value
+          pos_in_M1.y = strtof(Message + j, &pos1); //get float value
+        } else if (Message[j] == 'S') { //check for an Z
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
           zPos = strtof(Message + j, &pos1); //get float value
+        }
+      }
+    } else if (!strncmp(Message, "G28 ", 3)) {
+      for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
+        if (Message[j] == 'X') {  //check for an X
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++;  //increment until next whitespace
+          motor_b.setPosition(0);       // steps/s
+          motor_a.setPosition(0);      // steps/s
+        } else if (Message[j] == 'Y') {  //check for an X
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++;  //increment until next whitespace
+          motor_b.setPosition(0);       // steps/s
+          motor_a.setPosition(0);      // steps/s
+        } else if (Message[j] == 'Z') {  //check for an X
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++;  //increment until next whitespace
+          zPos = 0;
         }
       }
     } else if (!strncmp(Message, "G95 ", 3)) {
@@ -119,27 +134,21 @@ void loop()
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++;  //increment until next whitespace
           feedRate = strtof(Message + j, &pos1);  //get float value
+          motor_b.setMaxSpeed(feedRate);       // steps/s
+          motor_a.setMaxSpeed(feedRate);      // steps/s
         }
       }
     }
   }
 
-  pos_in_M1.y = 600;
-  line(pos_in_M1);
+  while (controller.isRunning())delay(0); //wait untill all movement is finished, then start the new one
 
-  pos_in_M1.x = (LENGTH_C / 2.0) + 300;
-  line(pos_in_M1);
+  if (zPos == 1000) myservo.write(servodown);
+  else if (zPos == 0) myservo.write(SERVOUP);
 
-  pos_in_M1.y = 0;
   line(pos_in_M1);
-
-  pos_in_M1.x = (LENGTH_C / 2.0) - 300;
-  //pos_in_M1.y = 0;
-  line(pos_in_M1);
-
+  Serial.println("done");
 }
-
-
 
 
 
@@ -192,6 +201,7 @@ void line(Position_in_M1_Struct M1_target) {
   float x_d = M1_target.x - M1_cur.x;
   float y_d = M1_target.y - M1_cur.y;
   float distance = sqrt(x_d * x_d + y_d * y_d);
+  if (distance <= 1.2) return;
   float divisor = (int)(distance / DELTA_L);
   if (divisor < 1) divisor = 1;
 
