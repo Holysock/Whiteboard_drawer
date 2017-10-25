@@ -58,7 +58,8 @@ char serialData[8];
 void setup()
 {
   myservo.attach(3);
-
+  myservo.write(SERVOUP);
+  delay(100);
   Serial.begin(115200);
   HWSERIAL.begin(115200);
 
@@ -71,9 +72,20 @@ void setup()
   .setMaxSpeed(feedRate)       // steps/s
   .setAcceleration(100000000); // steps/s^2
 
-  pos_in_M1.x = (LENGTH_C / 2.0) - 300;
+  /*
+  delay(1000);
+
+  pos_in_M1.x = 0;//(LENGTH_C / 2.0) - 300;
   pos_in_M1.y = 0;
-  line(pos_in_M1);
+  //line(pos_in_M1)
+  pos_in_M2 = to_M2(pos_in_M1);
+  Serial.println(pos_in_M2.a);
+  Serial.println(pos_in_M2.b);
+  pos_in_M1 = to_M1(pos_in_M2);
+  Serial.println(pos_in_M1.x);
+  Serial.println(pos_in_M1.y);
+  while(1) delay(1);
+  */
 }
 
 void loop()
@@ -162,8 +174,8 @@ void loop()
 // Transformation M1 -> M2
 struct Position_in_M2_Struct to_M2(Position_in_M1_Struct M1_pos) {
   struct Position_in_M2_Struct M2_pos;
-  M2_pos.a = sqrt( pow(M1_pos.x, 2) +  pow(M2_TRANSLATION_Y - M1_pos.y, 2));
-  M2_pos.b = sqrt( pow(M1_pos.x - LENGTH_C, 2) +  pow(M2_TRANSLATION_Y - M1_pos.y, 2));
+  M2_pos.a = sqrt( pow(M1_pos.x + LENGTH_C/2.0, 2) +  pow(M2_TRANSLATION_Y - M1_pos.y, 2));
+  M2_pos.b = sqrt( pow(M1_pos.x - LENGTH_C/2.0, 2) +  pow(M2_TRANSLATION_Y - M1_pos.y, 2));
   return M2_pos;
 }
 
@@ -174,7 +186,7 @@ struct Position_in_M1_Struct to_M1(Position_in_M2_Struct M2_pos) {
   float b = M2_pos.b;
   float c = LENGTH_C;
   float cos_alpha = (c * c + b * b - a * a) / (2 * b * c);
-  M1_pos.x = (LENGTH_C/2) - b * cos_alpha;
+  M1_pos.x = LENGTH_C/2.0 - b * cos_alpha;
   M1_pos.y = M2_TRANSLATION_Y - b * sin(acos(cos_alpha)); //use if thread length is limited
   return M1_pos;
 }
