@@ -15,7 +15,6 @@
 #define M2_TRANSLATION_Y (sqrt(pow(LENGTH_MAX, 2) - pow(LENGTH_C / 2.0, 2))) // y position of M2 origin in M1, use is thread length is limited
 #define DELTA_L 10.0
 #define STEP_PER_REVOLUTION 400
-#define SPEED_MAX 250
 #define DIAMETER 38
 #define LENGTH_PER_REVOLUTION  (DIAMETER * PI) //mm
 #define LPS (LENGTH_PER_REVOLUTION / STEP_PER_REVOLUTION)
@@ -41,6 +40,8 @@ char *pos1; //pos pointer 2
 
 char Message[SERIALBUFFERLEN]; // incoming String
 
+float feedRate = 250;
+
 struct Position_in_M1_Struct pos_in_M1;
 struct Position_in_M2_Struct pos_in_M2;
 
@@ -59,11 +60,11 @@ void setup()
 
   // setup the motors
   motor_b
-  .setMaxSpeed(SPEED_MAX)       // steps/s
+  .setMaxSpeed(feedRate)       // steps/s
   .setAcceleration(10000000); // steps/s^2
 
   motor_a
-  .setMaxSpeed(SPEED_MAX)       // steps/s
+  .setMaxSpeed(feedRate)       // steps/s
   .setAcceleration(100000000); // steps/s^2
 
   delay(5000);
@@ -110,6 +111,14 @@ void loop()
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
           zPos = strtof(Message + j, &pos1); //get float value
+        }
+      }
+    } else if (!strncmp(Message, "G95 ", 3)) {
+      for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
+        if (Message[j] == 'M') {  //check for an X
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++;  //increment until next whitespace
+          feedRate = strtof(Message + j, &pos1);  //get float value
         }
       }
     }
