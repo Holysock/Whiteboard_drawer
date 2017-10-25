@@ -174,7 +174,7 @@ struct Position_in_M1_Struct to_M1(Position_in_M2_Struct M2_pos) {
   float b = M2_pos.b;
   float c = LENGTH_C;
   float cos_alpha = (c * c + b * b - a * a) / (2 * b * c);
-  M1_pos.x = LENGTH_C - b * cos_alpha;
+  M1_pos.x = (LENGTH_C/2) - b * cos_alpha;
   M1_pos.y = M2_TRANSLATION_Y - b * sin(acos(cos_alpha)); //use if thread length is limited
   return M1_pos;
 }
