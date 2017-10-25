@@ -12,8 +12,9 @@
 #define LENGTH_C 1250 //length of C in mm (distance between spules)
 #define M2_TRANSLATION_X 0 // x position of M2 origin in M1 
 #define M2_TRANSLATION_Y (sqrt(pow(LENGTH_MAX, 2) - pow(LENGTH_C / 2.0, 2))) // y position of M2 origin in M1, use is thread length is limited
-#define DELTA_L 50.0
-#define STEP_PER_REVOLUTION 200
+#define DELTA_L 10.0
+#define STEP_PER_REVOLUTION 400
+#define SPEED_MAX 250
 #define DIAMETER 38
 #define LENGTH_PER_REVOLUTION  (DIAMETER * PI) //mm
 #define LPS (LENGTH_PER_REVOLUTION / STEP_PER_REVOLUTION) 
@@ -46,11 +47,11 @@ void setup()
 
 // setup the motors
   motor_b
-  .setMaxSpeed(200)       // steps/s
+  .setMaxSpeed(SPEED_MAX)       // steps/s
   .setAcceleration(10000000); // steps/s^2
 
   motor_a
-  .setMaxSpeed(200)       // steps/s 
+  .setMaxSpeed(SPEED_MAX)       // steps/s 
   .setAcceleration(100000000); // steps/s^2
 
   delay(5000);
@@ -63,13 +64,15 @@ void setup()
   Serial.printf("Back in M1 x: %f y: %f \n", pos_in_M1.x, pos_in_M1.y);
   */
 
-  //pos_in_M1.x = LENGTH_C / 2.0;
-  //pos_in_M1.y = 0;
-  //line(pos_in_M1);
-
   pos_in_M1.x = (LENGTH_C / 2.0) - 300;
   pos_in_M1.y = 0;
   line(pos_in_M1);
+
+
+}
+
+void loop()
+{
  
   pos_in_M1.y = 600;
   line(pos_in_M1);
@@ -80,16 +83,9 @@ void setup()
   pos_in_M1.y = 0;
   line(pos_in_M1);
 
-  pos_in_M1.x = LENGTH_C / 2.0;
+  pos_in_M1.x = (LENGTH_C / 2.0) -300;
   //pos_in_M1.y = 0;
   line(pos_in_M1);
-
-  delay(1000);
-
-}
-
-void loop()
-{
   
 }
 
@@ -148,9 +144,6 @@ void line(Position_in_M1_Struct M1_target){
   float distance = sqrt(x_d*x_d + y_d*y_d);
   float divisor = (int)(distance / DELTA_L);
   if(divisor < 1) divisor = 1;
-  Serial.println(divisor);
-  Serial.println(x_d);
-  Serial.println(distance);
   
   for(int i=1;i<=divisor;i++){
       M1_del.x = M1_cur.x + x_d * (i/divisor);
