@@ -11,7 +11,7 @@
 #define M2_TRANSLATION_X 0 // x position of M2 origin in M1 
 #define M2_TRANSLATION_Y (sqrt(pow(LENGTH_MAX, 2) - pow(LENGTH_C / 2.0, 2))) // y position of M2 origin in M1, use is thread length is limited
 #define DELTA_L 10.0
-#define STEP_PER_REVOLUTION 400
+#define STEP_PER_REVOLUTION 3200
 #define DIAMETER 38
 #define LENGTH_PER_REVOLUTION  (DIAMETER * PI) //mm
 #define LPS (LENGTH_PER_REVOLUTION / STEP_PER_REVOLUTION)
@@ -54,6 +54,7 @@ Stepper motor_b(9, 8);  //STEP pin =  9, DIR pin = 10
 StepControl<> controller;
 
 char serialData[8];
+boolean fast = 0;
 
 void setup()
 {
@@ -66,11 +67,11 @@ void setup()
   // setup the motors
   motor_b
   .setMaxSpeed(feedRate)       // steps/s
-  .setAcceleration(10000000); // steps/s^2
+  .setAcceleration(1000); // steps/s^2
 
   motor_a
   .setMaxSpeed(feedRate)       // steps/s
-  .setAcceleration(100000000); // steps/s^2
+  .setAcceleration(1000); // steps/s^2
 
   /*
   delay(1000);
@@ -101,7 +102,7 @@ void loop()
       }
     }
 
-    if (!strncmp(Message, "G01 ", 3) || !strncmp(Message, "G00 ", 3)) { //parsing part, it works...
+    if (!strncmp(Message, "G01 ", 3)){ //parsing part, it works...
       for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
         if (Message[j] == 'X') {  //check for an X
           pos1 = Message + j; //set pointer
@@ -111,17 +112,42 @@ void loop()
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
           pos_in_M1.y = strtof(Message + j, &pos1); //get float value
-        } else if (Message[j] == 'Z') { //check for an Y
+        } else if (Message[j] == 'Z') { //check for an Z
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
           servodown = (int)strtof(Message + j, &pos1); //get float value
           pos_in_M1.y = strtof(Message + j, &pos1); //get float value
-        } else if (Message[j] == 'S') { //check for an Z
+        } else if (Message[j] == 'S') { //check for an S
           pos1 = Message + j; //set pointer
           while (Message[++j] == ' ')pos1++; //increment until next whitespace
           zPos = strtof(Message + j, &pos1); //get float value
         }
       }
+      fast = false;
+      
+    } else if (!strncmp(Message, "G00 ", 3)) {
+      for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
+        if (Message[j] == 'X') {  //check for an X
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++;  //increment until next whitespace
+          pos_in_M1.x = strtof(Message + j, &pos1);  //get float value
+        } else if (Message[j] == 'Y') { //check for an Y
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++; //increment until next whitespace
+          pos_in_M1.y = strtof(Message + j, &pos1); //get float value
+        } else if (Message[j] == 'Z') { //check for an Z
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++; //increment until next whitespace
+          servodown = (int)strtof(Message + j, &pos1); //get float value
+          pos_in_M1.y = strtof(Message + j, &pos1); //get float value
+        } else if (Message[j] == 'S') { //check for an S
+          pos1 = Message + j; //set pointer
+          while (Message[++j] == ' ')pos1++; //increment until next whitespace
+          zPos = strtof(Message + j, &pos1); //get float value
+        }
+      }
+      fast = true;
+      
     } else if (!strncmp(Message, "G28 ", 3)) {
       for (int j = 3; j < SERIALBUFFERLEN - 1; j++) { //iterate throu the message
         if (Message[j] == 'X') {  //check for an X
@@ -151,15 +177,22 @@ void loop()
         }
       }
     }
+    Serial.println("done");
   }
 
   while (controller.isRunning())delay(0); //wait untill all movement is finished, then start the new one
 
-  if (zPos == 1000) myservo.write(servodown);
-  else if (zPos == 0) myservo.write(SERVOUP);
-
-  line(pos_in_M1);
-  Serial.println("done");
+  if(zPos == 1000){
+    myservo.write(servodown);
+    myservo.write(servodown);
+    myservo.write(servodown);
+  }
+  else if (zPos == 0){
+    myservo.write(SERVOUP);
+    myservo.write(SERVOUP);
+    myservo.write(SERVOUP);
+  }
+  line(pos_in_M1,fast);
 }
 
 
@@ -199,11 +232,19 @@ float step2length(int s) {
   return (float)(LENGTH_MAX - s * LPS);
 }
 
-void line(Position_in_M1_Struct M1_target) {
+void line(Position_in_M1_Struct M1_target, boolean fast_mode) {  
   struct Position_in_M2_Struct M2_cur;
   struct Position_in_M2_Struct M2_tmp;
   struct Position_in_M1_Struct M1_cur;
   struct Position_in_M1_Struct M1_del;
+
+  if(fast_mode){
+    M2_tmp = to_M2(M1_target);
+    motor_a.setTargetAbs(length2step(M2_tmp.a));
+    motor_b.setTargetAbs(length2step(M2_tmp.b));
+    controller.move(motor_a, motor_b);
+    return;
+  }
 
   M2_cur.a = step2length(motor_a.getPosition());
   M2_cur.b = step2length(motor_b.getPosition());
@@ -226,6 +267,7 @@ void line(Position_in_M1_Struct M1_target) {
     controller.move(motor_a, motor_b);
   }
 }
+
 
 
 
